@@ -1,11 +1,23 @@
 package com.example.recycler;
 
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.media.ExifInterface;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.Toast;
 import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.AspectRatio;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
@@ -15,21 +27,7 @@ import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
-
-import android.Manifest;
-import android.annotation.SuppressLint;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
-import android.graphics.drawable.BitmapDrawable;
-import android.media.ExifInterface;
-import android.os.Bundle;
-import android.view.View;
-import android.widget.ImageButton;
-import android.widget.ImageView;
-import android.widget.Toast;
+import androidx.fragment.app.Fragment;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -38,11 +36,14 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 
-public class MainActivity extends AppCompatActivity {
-    ImageButton capture, toggleFlash, flipCamera;
+public class MainFragment extends Fragment {
     private PreviewView previewView;
+    private ImageButton toggleFlash;
+    private ImageButton flipCamera;
+    private ImageView imageViewPreview;
     private File file;
-    int cameraFacing = CameraSelector.LENS_FACING_BACK;
+    private View rootView;
+    private Camera camera;
     private final ActivityResultLauncher<String> activityResultLauncher = registerForActivityResult(new ActivityResultContracts.RequestPermission(), new ActivityResultCallback<Boolean>() {
         @Override
         public void onActivityResult(Boolean result) {
@@ -51,19 +52,21 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     });
-    @SuppressLint("MissingInflatedId")
+    private androidx.camera.core.CameraSelector CameraSelector;
+    private int cameraFacing = CameraSelector.LENS_FACING_BACK;
+    private ImageCapture imageCapture;
+
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        View rootView = inflater.inflate(R.layout.fragment_main, container, false);
 
-        previewView = findViewById(R.id.cameraPreview);
-        capture = findViewById(R.id.capture);
-        toggleFlash = findViewById(R.id.toggleFlash);
-        flipCamera = findViewById(R.id.flipCamera);
+        previewView = rootView.findViewById(R.id.cameraPreview);
+        ImageButton capture = rootView.findViewById(R.id.capture);
+        toggleFlash = rootView.findViewById(R.id.toggleFlash);
+        flipCamera = rootView.findViewById(R.id.flipCamera);
+        imageViewPreview = rootView.findViewById(R.id.imageViewPreview);
 
-
-        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             activityResultLauncher.launch(Manifest.permission.CAMERA);
         } else {
             startCamera(cameraFacing);
@@ -72,78 +75,64 @@ public class MainActivity extends AppCompatActivity {
         flipCamera.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
                 if (cameraFacing == CameraSelector.LENS_FACING_BACK) {
                     cameraFacing = CameraSelector.LENS_FACING_FRONT;
                 } else {
                     cameraFacing = CameraSelector.LENS_FACING_BACK;
                 }
                 startCamera(cameraFacing);
-
-                Intent intent = new Intent(MainActivity.this, ListActivity.class);
-                intent.putExtra("imageFilePath", file.getAbsolutePath());
-                startActivity(intent);
             }
         });
-        findViewById(R.id.sendImageButton).setOnClickListener(new View.OnClickListener() {
+
+        capture.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                // Mengambil path file dari kamera
-                File file = new File(getExternalFilesDir(null), System.currentTimeMillis() + ".jpg");
-                Intent intent = new Intent(MainActivity.this, ListActivity.class);
-                intent.putExtra("imageFilePath", file.getAbsolutePath());
-                startActivity(intent);
+                if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    activityResultLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                }
+                takePicture();
             }
         });
-    }
 
+        toggleFlash.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                setFlashIcon();
+            }
+        });
+
+        return rootView;
+    }
 
     public void startCamera(int cameraFacing) {
         int aspectRatio = aspectRatio(previewView.getWidth(), previewView.getHeight());
-        ListenableFuture<ProcessCameraProvider> listenableFuture = ProcessCameraProvider.getInstance(this);
+        ListenableFuture<ProcessCameraProvider> listenableFuture = ProcessCameraProvider.getInstance(requireContext());
 
         listenableFuture.addListener(() -> {
             try {
-                ProcessCameraProvider cameraProvider = (ProcessCameraProvider) listenableFuture.get();
+                ProcessCameraProvider cameraProvider = listenableFuture.get();
 
                 Preview preview = new Preview.Builder().setTargetAspectRatio(aspectRatio).build();
 
-                ImageCapture imageCapture = new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                        .setTargetRotation(getWindowManager().getDefaultDisplay().getRotation()).build();
+                imageCapture = new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .setTargetRotation(requireActivity().getWindowManager().getDefaultDisplay().getRotation()).build();
 
                 CameraSelector cameraSelector = new CameraSelector.Builder()
                         .requireLensFacing(cameraFacing).build();
 
                 cameraProvider.unbindAll();
 
-                Camera camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture);
-
-                capture.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                            activityResultLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-                        }
-                        takePicture(imageCapture);
-                    }
-                });
-
-                toggleFlash.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        setFlashIcon(camera);
-                    }
-                });
+                camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture);
 
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
             } catch (ExecutionException | InterruptedException e) {
                 e.printStackTrace();
             }
-        }, ContextCompat.getMainExecutor(this));
+        }, ContextCompat.getMainExecutor(requireContext()));
     }
 
-    public void takePicture(ImageCapture imageCapture) {
-        final File file = new File(getExternalFilesDir(null), System.currentTimeMillis() + ".jpg");
+    public void takePicture() {
+        file = new File(requireContext().getExternalFilesDir(null), System.currentTimeMillis() + ".jpg");
         ImageCapture.OutputFileOptions outputFileOptions = new ImageCapture.OutputFileOptions.Builder(file).build();
         imageCapture.takePicture(outputFileOptions, Executors.newCachedThreadPool(), new ImageCapture.OnImageSavedCallback() {
             @Override
@@ -154,33 +143,29 @@ public class MainActivity extends AppCompatActivity {
                 bitmap = rotateBitmap(bitmap, rotationDegrees);
 
                 Bitmap finalBitmap = bitmap;
-                runOnUiThread(new Runnable() {
+                requireActivity().runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        ImageView imageView = findViewById(R.id.imageViewPreview);
-                        imageView.setImageBitmap(finalBitmap);
-                        imageView.setVisibility(View.VISIBLE);
+                        imageViewPreview.setImageBitmap(finalBitmap);
+                        imageViewPreview.setVisibility(View.VISIBLE);
 
+                        // Menampilkan tombol untuk mengirim gambar
+                        rootView.findViewById(R.id.sendImageButton).setVisibility(View.VISIBLE);
 
-                        findViewById(R.id.sendImageButton).setVisibility(View.VISIBLE);
-
+                        // Menyembunyikan tampilan pratinjau kamera
                         previewView.setVisibility(View.GONE);
                     }
                 });
-
-
-                startCamera(cameraFacing);
             }
 
             @Override
             public void onError(@NonNull ImageCaptureException exception) {
-                runOnUiThread(new Runnable() {
+                requireActivity().runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(MainActivity.this, "Failed to save: " + exception.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(), "Failed to save: " + exception.getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 });
-                startCamera(cameraFacing);
             }
         });
     }
@@ -215,10 +200,7 @@ public class MainActivity extends AppCompatActivity {
         return bitmap;
     }
 
-
-
-
-    private void setFlashIcon(Camera camera) {
+    private void setFlashIcon() {
         if (camera.getCameraInfo().hasFlashUnit()) {
             if (camera.getCameraInfo().getTorchState().getValue() == 0) {
                 camera.getCameraControl().enableTorch(true);
@@ -228,10 +210,10 @@ public class MainActivity extends AppCompatActivity {
                 toggleFlash.setImageResource(R.drawable.baseline_flash_on_24);
             }
         } else {
-            runOnUiThread(new Runnable() {
+            requireActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    Toast.makeText(MainActivity.this, "Flash is not available currently", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), "Flash is not available currently", Toast.LENGTH_SHORT).show();
                 }
             });
         }

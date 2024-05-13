@@ -14,5 +14,4 @@ public interface ContactDao {
     @Insert
     void insert(Contact contact);
 
-    // Tambahkan metode lain ubuntu operasi seperti update dan delete jika diperlukan.
 }

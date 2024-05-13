@@ -1,4 +1,4 @@
-// ImageDao.java
+
 package com.example.recycler;
 
 import androidx.room.Dao;

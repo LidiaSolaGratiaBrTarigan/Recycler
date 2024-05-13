@@ -1,4 +1,4 @@
-// AppDatabase.java
+
 package com.example.recycler;
 
 import android.content.Context;
