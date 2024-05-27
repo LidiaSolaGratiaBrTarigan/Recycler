@@ -8,7 +8,6 @@ import androidx.room.PrimaryKey;
 public class Image {
     @PrimaryKey(autoGenerate = true)
     private int id;
-
     private String filePath;
     private String uploadDate;
     private String status;

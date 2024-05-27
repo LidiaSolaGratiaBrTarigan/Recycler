@@ -1,5 +1,6 @@
 package com.example.recycler;
 
+
 import android.content.Context;
 import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;

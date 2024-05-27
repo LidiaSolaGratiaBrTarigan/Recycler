@@ -9,8 +9,6 @@ import java.util.List;
 
 @Dao
 public interface ImageDao {
-    @Query("SELECT * FROM images")
-    List<Image> getAllImages();
 
     @Insert
     void insert(Image image);

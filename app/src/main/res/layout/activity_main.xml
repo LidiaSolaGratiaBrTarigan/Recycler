@@ -68,4 +68,20 @@
         android:visibility="gone"
       />
 
+    <ImageButton
+        android:id="@+id/Picture"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_alignParentEnd="true"
+        android:layout_marginStart="130dp"
+        android:layout_marginTop="590dp"
+        android:layout_marginEnd="300dp"
+        android:layout_marginBottom="10sp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:scaleType="fitXY"
+        android:src="@drawable/baseline_close_24"
+        app:tint="@color/black"
+        android:visibility="gone"
+        />
+
 </RelativeLayout>

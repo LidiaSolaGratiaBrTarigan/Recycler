@@ -1,3 +1,4 @@
+
 package com.example.recycler;
 
 
@@ -39,9 +40,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity {
-    ImageButton capture, toggleFlash, flipCamera;
+    ImageButton capture, toggleFlash, flipCamera, pictureButton;
     private PreviewView previewView;
     private File file;
+    private File imageFile;
     int cameraFacing = CameraSelector.LENS_FACING_BACK;
     private final ActivityResultLauncher<String> activityResultLauncher = registerForActivityResult(new ActivityResultContracts.RequestPermission(), new ActivityResultCallback<Boolean>() {
         @Override
@@ -61,6 +63,8 @@ public class MainActivity extends AppCompatActivity {
         capture = findViewById(R.id.capture);
         toggleFlash = findViewById(R.id.toggleFlash);
         flipCamera = findViewById(R.id.flipCamera);
+        pictureButton = findViewById(R.id.Picture);
+        pictureButton.setVisibility(View.GONE);
 
 
         if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -88,11 +92,18 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.sendImageButton).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                // Mengambil path file dari kamera
                 File file = new File(getExternalFilesDir(null), System.currentTimeMillis() + ".jpg");
                 Intent intent = new Intent(MainActivity.this, ListActivity.class);
                 intent.putExtra("imageFilePath", file.getAbsolutePath());
                 startActivity(intent);
+            }
+        });
+
+        findViewById(R.id.Picture).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                previewView.setVisibility(View.VISIBLE);
+                startCamera(cameraFacing);
             }
         });
     }
@@ -143,12 +154,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void takePicture(ImageCapture imageCapture) {
-        final File file = new File(getExternalFilesDir(null), System.currentTimeMillis() + ".jpg");
+        file = new File(getExternalFilesDir(null), System.currentTimeMillis() + ".jpg");
         ImageCapture.OutputFileOptions outputFileOptions = new ImageCapture.OutputFileOptions.Builder(file).build();
         imageCapture.takePicture(outputFileOptions, Executors.newCachedThreadPool(), new ImageCapture.OnImageSavedCallback() {
             @Override
             public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
                 Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+                imageFile = file;
 
                 int rotationDegrees = getImageRotation(file.getAbsolutePath());
                 bitmap = rotateBitmap(bitmap, rotationDegrees);
@@ -163,13 +175,16 @@ public class MainActivity extends AppCompatActivity {
 
 
                         findViewById(R.id.sendImageButton).setVisibility(View.VISIBLE);
+                        findViewById(R.id.Picture).setVisibility(View.VISIBLE);
 
                         previewView.setVisibility(View.GONE);
                     }
                 });
-
-
-                startCamera(cameraFacing);
+                String imageFilePath = imageFile.getAbsolutePath();
+                // Pass image file path to ListActivity
+                Intent intent = new Intent(MainActivity.this, ListActivity.class);
+                intent.putExtra("imageFilePath", imageFilePath);
+                startActivity(intent);
             }
 
             @Override
